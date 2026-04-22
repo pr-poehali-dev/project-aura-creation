@@ -71,15 +71,40 @@ const girls = [
   },
 ]
 
+const PAYMENT_URL = "https://functions.poehali.dev/b9f4052f-e148-44b7-bc82-433e27a48293"
+
 function DonateModal({ girl, onClose }: { girl: typeof girls[0]; onClose: () => void }) {
   const amounts = [100, 300, 500, 1000, 2000, 5000]
   const [selected, setSelected] = useState(500)
   const [message, setMessage] = useState("")
-  const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleSend = () => {
-    setSent(true)
-    setTimeout(onClose, 2000)
+  const handleSend = async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const res = await fetch(PAYMENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: selected,
+          girl_name: girl.name,
+          message,
+          return_url: window.location.href,
+        }),
+      })
+      const data = await res.json()
+      if (data.confirmation_url) {
+        window.location.href = data.confirmation_url
+      } else {
+        setError("Не удалось создать платёж. Попробуйте позже.")
+      }
+    } catch {
+      setError("Ошибка соединения. Попробуйте ещё раз.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -97,68 +122,60 @@ function DonateModal({ girl, onClose }: { girl: typeof girls[0]; onClose: () => 
         exit={{ scale: 0.9, y: 20 }}
         transition={{ type: "spring", bounce: 0.3 }}
       >
-        {!sent ? (
-          <>
-            <button onClick={onClose} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
-              <Icon name="X" size={20} />
-            </button>
+        <button onClick={onClose} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+          <Icon name="X" size={20} />
+        </button>
 
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
-                <img src={girl.image} alt={girl.name} className="w-full h-full object-cover" />
-              </div>
-              <div>
-                <h3 className="font-serif text-xl text-foreground">Поддержать {girl.name}</h3>
-                <p className="text-muted-foreground text-sm">{girl.city} · {girl.mood} {girl.emoji}</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-muted-foreground mb-3">Выбери сумму</p>
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {amounts.map((amount) => (
-                <button
-                  key={amount}
-                  onClick={() => setSelected(amount)}
-                  className={`py-2 px-3 rounded-xl text-sm font-medium transition-all ${
-                    selected === amount
-                      ? "bg-primary text-primary-foreground scale-105"
-                      : "bg-secondary text-foreground hover:bg-accent"
-                  }`}
-                >
-                  {amount.toLocaleString()} ₽
-                </button>
-              ))}
-            </div>
-
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Напиши ей пару слов... (необязательно)"
-              className="w-full bg-secondary rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground resize-none h-20 focus:outline-none focus:ring-2 focus:ring-primary mb-4"
-            />
-
-            <button
-              onClick={handleSend}
-              className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-            >
-              <Icon name="Heart" size={18} />
-              Отправить {selected.toLocaleString()} ₽
-            </button>
-          </>
-        ) : (
-          <div className="text-center py-8">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", bounce: 0.5 }}
-              className="text-6xl mb-4"
-            >
-              💜
-            </motion.div>
-            <h3 className="font-serif text-2xl text-foreground mb-2">Донат отправлен!</h3>
-            <p className="text-muted-foreground text-sm">{girl.name} обязательно улыбнётся</p>
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
+            <img src={girl.image} alt={girl.name} className="w-full h-full object-cover" />
           </div>
+          <div>
+            <h3 className="font-serif text-xl text-foreground">Поддержать {girl.name}</h3>
+            <p className="text-muted-foreground text-sm">{girl.city} · {girl.mood} {girl.emoji}</p>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground mb-3">Выбери сумму</p>
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {amounts.map((amount) => (
+            <button
+              key={amount}
+              onClick={() => setSelected(amount)}
+              className={`py-2 px-3 rounded-xl text-sm font-medium transition-all ${
+                selected === amount
+                  ? "bg-primary text-primary-foreground scale-105"
+                  : "bg-secondary text-foreground hover:bg-accent"
+              }`}
+            >
+              {amount.toLocaleString()} ₽
+            </button>
+          ))}
+        </div>
+
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Напиши ей пару слов... (необязательно)"
+          className="w-full bg-secondary rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground resize-none h-20 focus:outline-none focus:ring-2 focus:ring-primary mb-4"
+        />
+
+        {error && (
+          <p className="text-red-500 text-sm mb-3 text-center">{error}</p>
         )}
+
+        <button
+          onClick={handleSend}
+          disabled={loading}
+          className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {loading ? (
+            <Icon name="Loader2" size={18} className="animate-spin" />
+          ) : (
+            <Icon name="Heart" size={18} />
+          )}
+          {loading ? "Создаём платёж..." : `Отправить ${selected.toLocaleString()} ₽`}
+        </button>
       </motion.div>
     </motion.div>
   )
